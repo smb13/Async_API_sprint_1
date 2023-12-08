@@ -131,7 +131,7 @@ def fetch_film_works(
             logger.info("Fetching film_works data")
             sql = """ 
                 SELECT
-                    fw.id as id,
+                    fw.id as uuid,
                     fw.rating, 
                     fw.title, 
                     fw.description, 
@@ -143,13 +143,21 @@ def fetch_film_works(
                        json_agg(
                            DISTINCT jsonb_build_object(
                                'person_role', pfw.role,
-                               'person_id', p.id,
-                               'person_name', p.full_name
+                               'person_uuid', p.id,
+                               'person_full_name', p.full_name
                            )
                        ) FILTER (WHERE p.id is not null),
                        '[]'
                     ) as persons,
-                    array_agg(DISTINCT g.name) as genres
+                    COALESCE (
+                       json_agg(
+                           DISTINCT jsonb_build_object(
+                               'genre_uuid', g.id,
+                               'genre_name', g.name
+                           )
+                       ) FILTER (WHERE g.id is not null),
+                       '[]'
+                    ) as genres
                 FROM film_work fw
                 LEFT JOIN person_film_work pfw ON pfw.film_work_id = fw.id
                 LEFT JOIN person p ON p.id = pfw.person_id
@@ -194,4 +202,4 @@ def save_movies(
     while movies := (yield):
         logger.info(f'Received for saving {len(movies)} movies')
         for movie in movies:
-            es.index(index=elastic_settings.index_name, id=movie.id, document=movie.to_elastic())
+            es.index(index=elastic_settings.index_name, id=movie.uuid, document=movie.to_elastic())

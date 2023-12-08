@@ -65,14 +65,24 @@ class ElasticSettings(BaseSettings):
     index_mappings: dict = {
         "dynamic": "strict",
         "properties": {
-            "id": {
+            "uuid": {
                 "type": "keyword"
             },
             "imdb_rating": {
                 "type": "float"
             },
             "genre": {
-                "type": "keyword"
+                "type": "nested",
+                "dynamic": "strict",
+                "properties": {
+                    "uuid": {
+                        "type": "keyword"
+                    },
+                    "name": {
+                        "type": "text",
+                        "analyzer": "ru_en"
+                    }
+                }
             },
             "title": {
                 "type": "text",
@@ -87,9 +97,18 @@ class ElasticSettings(BaseSettings):
                 "type": "text",
                 "analyzer": "ru_en"
             },
-            "director": {
-                "type": "text",
-                "analyzer": "ru_en"
+            "directors": {
+                "type": "nested",
+                "dynamic": "strict",
+                "properties": {
+                    "uuid": {
+                        "type": "keyword"
+                    },
+                    "full_name": {
+                        "type": "text",
+                        "analyzer": "ru_en"
+                    }
+                }
             },
             "actors_names": {
                 "type": "text",
@@ -103,10 +122,10 @@ class ElasticSettings(BaseSettings):
                 "type": "nested",
                 "dynamic": "strict",
                 "properties": {
-                    "id": {
+                    "uuid": {
                         "type": "keyword"
                     },
-                    "name": {
+                    "full_name": {
                         "type": "text",
                         "analyzer": "ru_en"
                     }
@@ -116,10 +135,10 @@ class ElasticSettings(BaseSettings):
                 "type": "nested",
                 "dynamic": "strict",
                 "properties": {
-                    "id": {
+                    "uuid": {
                         "type": "keyword"
                     },
-                    "name": {
+                    "full_name": {
                         "type": "text",
                         "analyzer": "ru_en"
                     }
