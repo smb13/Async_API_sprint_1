@@ -5,3 +5,4 @@ __pycache__/
 
 # JetBrains IDE
 /.idea/
+/configs/.env
