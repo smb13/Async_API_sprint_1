@@ -1,3 +1,4 @@
+# noinspection SpellCheckingInspection
 LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 LOG_DEFAULT_HANDLERS = ['console', ]
 
@@ -6,6 +7,7 @@ LOG_DEFAULT_HANDLERS = ['console', ]
 # https://docs.python.org/3/howto/logging.html
 # https://docs.python.org/3/howto/logging-cookbook.html
 
+# noinspection SpellCheckingInspection
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
