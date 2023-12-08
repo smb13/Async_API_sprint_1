@@ -34,21 +34,21 @@ services:
     ports:
       - "6379:6379"
 
-#  etl:
-#    build: etl
-#    env_file: configs/.env
-#    environment:
-#      - POSTGRES_HOST=postgres
-#      - ELASTIC_HOST=es
-#      - ETL_STATE_FILE_PATH=state/storage.json
-#    volumes:
-#      - ./logs:/opt/app/logs
-#      - app-data:/opt/app/state
-#    depends_on:
-#      postgres:
-#        condition: service_healthy
-#      es:
-#        condition: service_healthy
+  etl:
+    build: etl
+    env_file: configs/.env
+    environment:
+      - POSTGRES_HOST=postgres
+      - ELASTIC_HOST=es
+      - ETL_STATE_FILE_PATH=state/storage.json
+    volumes:
+      - ./logs:/opt/app/logs
+      - app-data:/opt/app/state
+    depends_on:
+      postgres:
+        condition: service_healthy
+      es:
+        condition: service_healthy
 
   api:
     build: src
