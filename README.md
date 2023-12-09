@@ -31,7 +31,7 @@ ETL_TIMEOUT=2
 
 Для запуска можно использовать следующую команду:
 ```sh
-docker-compose up -d .
+docker-compose --profile etl --profile api up -d
 ```
 
 В результате:
