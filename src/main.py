@@ -17,7 +17,7 @@ from db import elastic, redisdb as redis
 async def lifespan(_: FastAPI):
     # Создаем подключение к базам при старте сервера.
     redis.redis = Redis(host=config.REDIS_HOST, port=config.REDIS_PORT)
-    elastic.es = AsyncElasticsearch(hosts=[f'{config.ELASTIC_HOST}:{config.ELASTIC_PORT}'])
+    elastic.es = AsyncElasticsearch(hosts=[f'http://{config.ELASTIC_HOST}:{config.ELASTIC_PORT}'])
 
     # Проверяем соединения с базами.
     await redis.redis.ping()
