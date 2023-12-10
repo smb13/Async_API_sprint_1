@@ -37,18 +37,21 @@ class FilmService:
         return film
 
     async def get_films(
-            self, sort: str | None, genre: str | None, page: int | None = 1, per_page: int | None = 1
+            self, *, sort: str | None, genre: str | None = None,
+            page: int | None = 1, per_page: int | None = 1, film: str | None = None
     ) -> List[Film]:
         # Пытаемся получить данные из кеша, потому что оно работает быстрее.
-        films = await self._films_list_from_cache(sort=sort, genre=genre, page=page, per_page=per_page)
+        films = await self._films_list_from_cache(sort=sort, genre=genre, page=page, per_page=per_page, film=film)
         if not films:
             # Если фильмов нет в кеше, то ищем их в Elasticsearch
-            films = await self._get_films_list_from_elastic(sort=sort, genre=genre, page=page, per_page=per_page)
+            films = await self._get_films_list_from_elastic(
+                sort=sort, genre=genre, page=page, per_page=per_page, film=film
+            )
             if not films:
                 # Если он отсутствует в Elasticsearch, значит, фильма вообще нет в базе
                 return []
             # Сохраняем фильм в кеш
-            await self._put_films_list_to_cache(sort=sort, genre=genre, page=page, per_page=per_page)
+            await self._put_films_list_to_cache(sort=sort, genre=genre, page=page, per_page=per_page, film=film)
 
         return films
 
@@ -60,7 +63,8 @@ class FilmService:
         return Film(**doc['_source'])
 
     async def _get_films_list_from_elastic(
-            self, sort: str | None, genre: str | None, page: int | None = 1, per_page: int | None = 1
+            self, *, sort: str | None, genre: str | None,
+            page: int | None = 1, per_page: int | None = 1, film: str | None = None
     ) -> Optional[List[Film]]:
         # Проверка аргументов.
         if page <= 0:
@@ -71,35 +75,20 @@ class FilmService:
             must = []
             if genre:
                 must.append({
-                    "nested": {
-                        "path": "genre",
-                        "query": {
-                            "bool": {
-                                "must": [{
-                                    "match": {
-                                        "genre.name": genre
-                                    }
-                                }]
-                            }
-                        }
-                    }
+                    "nested": {"path": "genre", "query": {"bool": {"must": [{"match": {"genre.name": genre}}]}}}
                 })
-            body = {
-                "query": {
-                    "bool": {
-                        "must": must
-                    }
-                }
-            }
+            if film:
+                must.append({"match": {"title": film}})
             doc = await self.elastic.search(
-                index='movies', body=body,
+                index='movies',
+                body={"query": {"bool": {"must": must}}},
                 from_=(page - 1) * per_page,
                 size=per_page,
                 sort=(sort[1:]+":desc" if sort[0] == '-' else sort) if sort else None
             )
         except NotFoundError:
             return None
-        return list(map(lambda film: Film(**film['_source']), doc['hits']['hits']))
+        return list(map(lambda flm: Film(**flm['_source']), doc['hits']['hits']))
 
     async def _film_from_cache(self, film_id: UUID4) -> Optional[Film]:
         # Пытаемся получить данные о фильме из кеша, используя команду get https://redis.io/commands/get/

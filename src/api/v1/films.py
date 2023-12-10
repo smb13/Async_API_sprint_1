@@ -99,15 +99,33 @@ async def film_details(
 
 
 @router.get('/', response_model=List[Film],
-            description='Получение информации о фильме', name='Получение информации о фильме')
+            description='Получение списка фильмов', name='Получение списка фильмов')
 async def films_list(
-        genre: Annotated[str, Query(description='Фильтр по жанрам')] = None,
+        genre: Annotated[str, Query(description='Фильтр по жанрам', example='Drama')] = None,
         sort: Annotated[str | None, Query(enum=['imdb_rating', '-imdb_rating'], description='Сортировка')] = None,
         page_size: Annotated[int, Query(description='Число элементов на странице'), Gt(0), Le(100)] = 50,
         page_number: Annotated[int, Query(description='Номер страницы '), Gt(0)] = 1,
         film_service: FilmService = Depends(get_film_service)
 ) -> List[Film]:
-    films = await film_service.get_films(sort, genre, page_number, page_size)
+    films = await film_service.get_films(sort=sort, genre=genre, page=page_number, per_page=page_size)
+    if not films:
+        # Если ни один фильм не найден, отдаём 404 статус
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail='films not found')
+
+    # Перекладываем данные из models.Film в Film.
+    return list(map(lambda film: Film(**film.model_dump()), films))
+
+
+@router.get('/search/', response_model=List[Film],
+            description='Поиск фильмов', name='Поиск фильмов')
+async def films_search(
+        query: Annotated[str, Query(description='строка поиска', example='Star')] = None,
+        sort: Annotated[str | None, Query(enum=['imdb_rating', '-imdb_rating'], description='Сортировка')] = None,
+        page_size: Annotated[int, Query(description='Число элементов на странице'), Gt(0), Le(100)] = 50,
+        page_number: Annotated[int, Query(description='Номер страницы '), Gt(0)] = 1,
+        film_service: FilmService = Depends(get_film_service)
+) -> List[Film]:
+    films = await film_service.get_films(sort=sort, film=query, page=page_number, per_page=page_size)
     if not films:
         # Если ни один фильм не найден, отдаём 404 статус
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail='films not found')
