@@ -54,7 +54,7 @@ class FilmService:
 
     async def _put_film_to_cache(self, film: Film):
         # Сохраняем данные о фильме в кэше, указывая время жизни.
-        await self.redis.set(film.id, film.model_dump_json(), FILM_CACHE_EXPIRE_IN_SECONDS)
+        await self.redis.set(str(film.uuid), film.model_dump_json(), FILM_CACHE_EXPIRE_IN_SECONDS)
 
 
 # Get_film_service — это провайдер FilmService.
