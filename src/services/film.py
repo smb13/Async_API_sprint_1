@@ -1,3 +1,4 @@
+import orjson
 from functools import lru_cache
 from typing import Optional, List
 
@@ -38,20 +39,21 @@ class FilmService:
 
     async def get_films(
             self, *, sort: str | None, genre: str | None = None,
-            page: int | None = 1, per_page: int | None = 1, film: str | None = None
+            page: int | None = 1, per_page: int | None = 1, query: str | None = None
     ) -> List[Film]:
         # Пытаемся получить данные из кеша, потому что оно работает быстрее.
-        films = await self._films_list_from_cache(sort=sort, genre=genre, page=page, per_page=per_page, film=film)
+        films = await self._films_list_from_cache(sort=sort, genre=genre, page=page, per_page=per_page, query=query)
         if not films:
             # Если фильмов нет в кеше, то ищем их в Elasticsearch
             films = await self._get_films_list_from_elastic(
-                sort=sort, genre=genre, page=page, per_page=per_page, film=film
+                sort=sort, genre=genre, page=page, per_page=per_page, film=query
             )
             if not films:
                 # Если он отсутствует в Elasticsearch, значит, фильма вообще нет в базе
                 return []
             # Сохраняем фильм в кеш
-            await self._put_films_list_to_cache(sort=sort, genre=genre, page=page, per_page=per_page, film=film)
+            await self._put_films_list_to_cache(sort=sort, genre=genre, page=page, per_page=per_page,
+                                                query=query, films=films)
 
         return films
 
@@ -99,16 +101,24 @@ class FilmService:
         film = Film.model_validate_json(data)
         return film
 
-    async def _films_list_from_cache(self, **kwargs) -> Optional[Film]:
-        # TODO Добавить поддержку кэширования
-        return None
+    async def _films_list_from_cache(self, **kwargs) -> Optional[List[Film]]:
+        # Пытаемся получить данные о фильме из кеша, используя команду get https://redis.io/commands/get/
+        data = await self.redis.get(orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS))
+        if not data:
+            return None
+
+        return [Film.model_validate_json(film) for film in orjson.loads(data)]
 
     async def _put_film_to_cache(self, film: Film):
         # Сохраняем данные о фильме в кэше, указывая время жизни.
         await self.redis.set(str(film.uuid), film.model_dump_json(), FILM_CACHE_EXPIRE_IN_SECONDS)
 
-    async def _put_films_list_to_cache(self, **kwargs):
-        # TODO Добавить поддержку кэширования
+    async def _put_films_list_to_cache(self, films: List[Film], **kwargs):
+        await self.redis.set(
+            orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS),
+            orjson.dumps([ob.model_dump_json() for ob in films]),
+            FILM_CACHE_EXPIRE_IN_SECONDS
+        )
         return None
 
 

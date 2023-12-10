@@ -125,7 +125,7 @@ async def films_search(
         page_number: Annotated[int, Query(description='Номер страницы '), Gt(0)] = 1,
         film_service: FilmService = Depends(get_film_service)
 ) -> List[Film]:
-    films = await film_service.get_films(sort=sort, film=query, page=page_number, per_page=page_size)
+    films = await film_service.get_films(sort=sort, query=query, page=page_number, per_page=page_size)
     if not films:
         # Если ни один фильм не найден, отдаём 404 статус
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail='films not found')
