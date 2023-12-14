@@ -8,9 +8,10 @@ from annotated_types import Gt
 from elasticsearch import Elasticsearch
 from psycopg import ServerCursor
 from psycopg.rows import dict_row
+from typing_extensions import Union, Type
 
 from logger import logger
-from models import Movie
+from models import Movie, Genre
 from settings import elastic_settings
 from state import State
 
@@ -25,9 +26,20 @@ def coroutine(func):
     return inner
 
 
+def get_class_by_index(index_name: str) -> Union[Type[Movie], Type[Genre]]:
+    match index_name:
+        case elastic_settings.movies_index_name:
+            return Movie
+        case elastic_settings.genres_index_name:
+            return Genre
+        case _:
+            raise RuntimeError('Unprocessable index_name.')
+
+
 @coroutine
 def fetch_changes(
         pg: psycopg.Connection,
+        index_name: str,
         table_name: str,
         next_step: Generator,
         *,
@@ -37,6 +49,7 @@ def fetch_changes(
     """
     Получение идентификаторов всех записей, изменившихся после последней проверки.
     :param pg: Соединение с бд
+    :param index_name: имя индекса
     :param table_name: Имя таблицы
     :param next_step: Генератор, используемый на следующем шагу обработки
     :param default_is_now: Флаг, показывающий, что если нет сохраненного состояния,
@@ -47,10 +60,10 @@ def fetch_changes(
     while cur_state := (yield):
         with ServerCursor(pg, 'fetch_changes', row_factory=dict_row) as cur:
 
-            last_updated = cur_state.get_state(table_name+'_last_updated') \
+            last_updated = cur_state.get_state(index_name + '_' + table_name + '_last_updated') \
                            or (default_is_now and datetime.now()) or datetime.min
 
-            fuzzy_mode = cur_state.get_state(table_name + '_fuzzy')
+            fuzzy_mode = cur_state.get_state(index_name + '_' + table_name + '_fuzzy')
 
             logger.info(f"""Fetching changed from {table_name} table after {last_updated}""")
 
@@ -64,18 +77,18 @@ def fetch_changes(
             )
             while results := cur.fetchmany(size=bulk_size):
                 # Обработка полученных данных следующим генератором.
-                next_step.send([fw['id'] for fw in results])
+                next_step.send([uuid['id'] for uuid in results])
 
                 # В данной точке, все данные из полученной пачки обработаны, можно менять состояние.
-                cur_state.set_state(table_name+'_last_updated', str(results[-1]['updated_at']))
+                cur_state.set_state(index_name + '_' + table_name + '_last_updated', str(results[-1]['updated_at']))
 
                 # Но при этом, возможно, что есть еще записи с таким же значением поля updated_at,
                 # которые еще не обработаны, поэтому состояние помечается как нечеткое.
                 if not fuzzy_mode:
                     fuzzy_mode = True
-                    cur_state.set_state(table_name + '_fuzzy', fuzzy_mode)
+                    cur_state.set_state(index_name + '_' + table_name + '_fuzzy', fuzzy_mode)
             # Тут все записи уже точно обработаны, поэтому состояние помечается как четкое.
-            cur_state.set_state(table_name + '_fuzzy', False)
+            cur_state.set_state(index_name + '_' + table_name + '_fuzzy', False)
 
 
 @coroutine
@@ -102,9 +115,9 @@ def fetch_film_works_ids(
                 f"""
                 SELECT fw.id as id
                 FROM film_work fw
-                LEFT JOIN {table_name+'_film_work'} gfw ON gfw.film_work_id = fw.id
+                LEFT JOIN {table_name + '_film_work'} gfw ON gfw.film_work_id = fw.id
                 LEFT JOIN {table_name} g ON g.id = gfw.{table_name}_id
-                WHERE g.id IN ("""+",".join(['%s' for _ in ids])+""")
+                WHERE g.id IN (""" + ",".join(['%s' for _ in ids]) + """)
                 """,
                 ids
             )
@@ -126,7 +139,7 @@ def fetch_film_works(
     :param bulk_size: Максимальное число одновременно обрабатываемых записей
     :return: Генератор, принимающий на вход список идентификаторов кинопроизведений
     """
-    with ServerCursor(pg, 'enricher', row_factory=dict_row) as cur:
+    with ServerCursor(pg, 'film_works_enricher', row_factory=dict_row) as cur:
         while ids := (yield):
             logger.info("Fetching film_works data")
             sql = """ 
@@ -163,7 +176,7 @@ def fetch_film_works(
                 LEFT JOIN person p ON p.id = pfw.person_id
                 LEFT JOIN genre_film_work gfw ON gfw.film_work_id = fw.id
                 LEFT JOIN genre g ON g.id = gfw.genre_id
-                WHERE fw.id IN ("""+",".join(['%s' for _ in ids])+""")
+                WHERE fw.id IN (""" + ",".join(['%s' for _ in ids]) + """)
                 GROUP BY fw.id"""
             cur.execute(sql, ids)
 
@@ -172,34 +185,69 @@ def fetch_film_works(
 
 
 @coroutine
-def transform_film_works(
-        next_step: Generator
-) -> Generator[None, list[dict], None]:
+def fetch_genres(
+        pg: psycopg.Connection,
+        next_step: Generator,
+        *,
+        bulk_size: Annotated[int, Gt(0)] = 100
+) -> Generator[None, dict, None]:
+    """
+    Получение данных жанрах
+    :param pg: Соединение с бд
+    :param next_step: Генератор, используемый на следующем шагу обработки
+    :param bulk_size: Максимальное число одновременно обрабатываемых записей
+    :return: Генератор, принимающий на вход список идентификаторов кинопроизведений
+    """
+    with ServerCursor(pg, 'genres_enricher', row_factory=dict_row) as cur:
+        while ids := (yield):
+            logger.info("Fetching genres data")
+            sql = """ 
+                SELECT
+                    g.id as genre_uuid,
+                    g.name as genre_name                   
+                FROM genre g
+                WHERE g.id IN (""" + ",".join(['%s' for _ in ids]) + """)
+                """
+            cur.execute(sql, ids)
+
+            while results := cur.fetchmany(size=bulk_size):
+                next_step.send(results)
+
+
+@coroutine
+def transform_data(index_name: str,
+                   next_step: Generator
+                   ) -> Generator[None, list[dict], None]:
     """
     Подготовка данных для обновления индекса в elasticsearch
-    :param next_step: Генератор, используемый на следующем шагу обработки
+    :param  index_name: имя индекса
+    :param  next_step: Генератор, используемый на следующем шагу обработки
     :return: Генератор, принимающий на вход список данных кинопроизведений для обновления индекса elasticsearch
     """
-    while movie_dicts := (yield):
+    data_class = get_class_by_index(index_name)
+    while data_dicts := (yield):
         batch = []
-        for movie_dict in movie_dicts:
-            movie = Movie(**movie_dict)
-            logger.debug(movie.model_dump())
-            batch.append(movie)
+        for data_dict in data_dicts:
+            data_object = data_class(**data_dict)
+            logger.debug(data_object.model_dump())
+            batch.append(data_object)
         next_step.send(batch)
 
 
 @coroutine
-def save_movies(
+def save_data(
+        index_name: str,
         es: Elasticsearch
-) -> Generator[None, list[Movie], None]:
+) -> Generator[None, list[Union[Movie, Genre]], None]:
     """
     Обновление индекса в elasticsearch
-    :param es: Соединение с elasticsearch
+    :param  index_name: имя индекса
+    :param  es: Соединение с elasticsearch
     :return: Генератор, принимающий на вход полностью подготовленный список
         кинопроизведений для обновления индекса elasticsearch
     """
-    while movies := (yield):
-        logger.info(f'Received for saving {len(movies)} movies')
-        for movie in movies:
-            es.index(index=elastic_settings.index_name, id=movie.uuid, document=movie.to_elastic())
+    data_class = get_class_by_index(index_name)
+    while items := (yield):
+        logger.info(f'Received for saving {len(items)} {data_class.__name__}s')
+        for item in items:
+            es.index(index=index_name, id=item.uuid, document=item.to_elastic())

@@ -3,7 +3,7 @@ from time import sleep
 import psycopg
 from elasticsearch import Elasticsearch
 
-from generators import fetch_changes, save_movies, transform_film_works, fetch_film_works, fetch_film_works_ids
+from generators import fetch_changes, save_data, transform_data, fetch_film_works, fetch_film_works_ids, fetch_genres
 from logger import logger
 from postgres import pg_connect, pg_reconnect
 from elastic import elastic_init, elastic_connect, elastic_reconnect
@@ -12,29 +12,46 @@ from state import JsonFileStorage, State
 
 
 def process(pg: psycopg.Connection, es: Elasticsearch):
-    updater = save_movies(es)
-    transformer = transform_film_works(updater)
-    fetcher = fetch_film_works(pg, transformer)
+    # Паплайн обновления индекса movies
+    movies_updater = save_data(index_name=elastic_settings.movies_index_name, es=es)
+    movies_transformer = transform_data(index_name=elastic_settings.movies_index_name, next_step=movies_updater)
+    movies_fetcher = fetch_film_works(pg=pg, next_step=movies_transformer)
 
-    film_work_syncer = fetch_changes(pg, 'film_work', fetcher)
+    movies_film_work_syncer = fetch_changes(pg=pg, index_name=elastic_settings.movies_index_name,
+                                            table_name='film_work', next_step=movies_fetcher)
 
     # Первичная синхронизация идет по таблице film_work, поэтому для других таблиц указываем,
     # что нужно рассматривать только изменения, произведенные после текущего момента.
-    film_works_by_genre = fetch_film_works_ids(pg, 'genre', fetcher)
-    genres_syncer = fetch_changes(pg, 'genre', film_works_by_genre, default_is_now=True)
+    movies_film_works_by_genre = fetch_film_works_ids(pg=pg, table_name='genre', next_step=movies_fetcher)
+    movies_genres_syncer = fetch_changes(pg=pg, index_name=elastic_settings.movies_index_name, table_name='genre',
+                                         next_step=movies_film_works_by_genre, default_is_now=False)
 
-    film_works_by_person = fetch_film_works_ids(pg, 'person', fetcher)
-    person_syncer = fetch_changes(pg, 'person', film_works_by_person, default_is_now=True)
+    movies_film_works_by_person = fetch_film_works_ids(pg=pg, table_name='person', next_step=movies_fetcher)
+    movies_person_syncer = fetch_changes(pg=pg, index_name=elastic_settings.movies_index_name,
+                                         table_name='person', next_step=movies_film_works_by_person,
+                                         default_is_now=False)
+
+    # Паплайн обновления индекса genres
+    genres_updater = save_data(index_name=elastic_settings.genres_index_name, es=es)
+    genres_transformer = transform_data(index_name=elastic_settings.genres_index_name, next_step=genres_updater)
+    genres_fetcher = fetch_genres(pg=pg, next_step=genres_transformer)
+    genres_genres_syncer = fetch_changes(pg=pg, index_name=elastic_settings.genres_index_name,
+                                         table_name='genre', next_step=genres_fetcher, default_is_now=False)
 
     # Запускаем цикл проверки обновлений.
     logger.info('Starting ETL process for updates ...')
     while True:
+        # Паплайн обновления индекса movies
         # Проверка обновлений в таблице кинопроизведений.
-        film_work_syncer.send(state)
+        movies_film_work_syncer.send(state)
         # Проверка обновлений в таблице жанров.
-        genres_syncer.send(state)
+        movies_genres_syncer.send(state)
         # Проверка обновлений в таблице персон.
-        person_syncer.send(state)
+        movies_person_syncer.send(state)
+
+        # Паплайн обновления индекса genres
+        genres_genres_syncer.send(state)
+
         # Приостановка.
         sleep(etl_settings.timeout)
 
