@@ -33,7 +33,7 @@ class PostgresSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix='postgres_', env_file='.env')
 
     def get_dsn(self):
-        return make_conninfo(** self.model_dump(exclude={'pg_schema'}))
+        return make_conninfo(**self.model_dump(exclude={'pg_schema'}))
 
     def get_connection_info(self):
         """
@@ -57,96 +57,18 @@ class PostgresSettings(BaseSettings):
         }
 
 
+class IndexSettings(BaseSettings):
+    index_name: str
+    index_mappings: dict
+
+
 class ElasticSettings(BaseSettings):
     es_schema: str = Field('http')
     host: str = Field('localhost')
     port: int = Field(9200)
-    index_name: str = Field('movies')
-    index_mappings: dict = {
-        "dynamic": "strict",
-        "properties": {
-            "uuid": {
-                "type": "keyword"
-            },
-            "imdb_rating": {
-                "type": "float"
-            },
-            "genre": {
-                "type": "nested",
-                "dynamic": "strict",
-                "properties": {
-                    "uuid": {
-                        "type": "keyword"
-                    },
-                    "name": {
-                        "type": "text",
-                        "analyzer": "ru_en"
-                    }
-                }
-            },
-            "title": {
-                "type": "text",
-                "analyzer": "ru_en",
-                "fields": {
-                    "raw": {
-                        "type": "keyword"
-                    }
-                }
-            },
-            "description": {
-                "type": "text",
-                "analyzer": "ru_en"
-            },
-            "directors": {
-                "type": "nested",
-                "dynamic": "strict",
-                "properties": {
-                    "uuid": {
-                        "type": "keyword"
-                    },
-                    "full_name": {
-                        "type": "text",
-                        "analyzer": "ru_en"
-                    }
-                }
-            },
-            "actors_names": {
-                "type": "text",
-                "analyzer": "ru_en"
-            },
-            "writers_names": {
-                "type": "text",
-                "analyzer": "ru_en"
-            },
-            "actors": {
-                "type": "nested",
-                "dynamic": "strict",
-                "properties": {
-                    "uuid": {
-                        "type": "keyword"
-                    },
-                    "full_name": {
-                        "type": "text",
-                        "analyzer": "ru_en"
-                    }
-                }
-            },
-            "writers": {
-                "type": "nested",
-                "dynamic": "strict",
-                "properties": {
-                    "uuid": {
-                        "type": "keyword"
-                    },
-                    "full_name": {
-                        "type": "text",
-                        "analyzer": "ru_en"
-                    }
-                }
-            }
-        }
-    }
-    index_settings: dict = {
+    movies_index_name: str = Field('movies')
+    genres_index_name: str = Field('genres')
+    indexes_settings: dict = Field({
         "refresh_interval": "1s",
         "analysis": {
             "filter": {
@@ -185,7 +107,107 @@ class ElasticSettings(BaseSettings):
                 }
             }
         }
-    }
+    })
+    indexes_mappings: dict = Field(
+        {"movies":
+             {"dynamic": "strict",
+              "properties": {
+                  "uuid": {
+                      "type": "keyword"
+                  },
+                  "imdb_rating": {
+                      "type": "float"
+                  },
+                  "genre": {
+                      "type": "nested",
+                      "dynamic": "strict",
+                      "properties": {
+                          "uuid": {
+                              "type": "keyword"
+                          },
+                          "name": {
+                              "type": "text",
+                              "analyzer": "ru_en"
+                          }
+                      }
+                  },
+                  "title": {
+                      "type": "text",
+                      "analyzer": "ru_en",
+                      "fields": {
+                          "raw": {
+                              "type": "keyword"
+                          }
+                      }
+                  },
+                  "description": {
+                      "type": "text",
+                      "analyzer": "ru_en"
+                  },
+                  "directors": {
+                      "type": "nested",
+                      "dynamic": "strict",
+                      "properties": {
+                          "uuid": {
+                              "type": "keyword"
+                          },
+                          "full_name": {
+                              "type": "text",
+                              "analyzer": "ru_en"
+                          }
+                      }
+                  },
+                  "actors_names": {
+                      "type": "text",
+                      "analyzer": "ru_en"
+                  },
+                  "writers_names": {
+                      "type": "text",
+                      "analyzer": "ru_en"
+                  },
+                  "actors": {
+                      "type": "nested",
+                      "dynamic": "strict",
+                      "properties": {
+                          "uuid": {
+                              "type": "keyword"
+                          },
+                          "full_name": {
+                              "type": "text",
+                              "analyzer": "ru_en"
+                          }
+                      }
+                  },
+                  "writers": {
+                      "type": "nested",
+                      "dynamic": "strict",
+                      "properties": {
+                          "uuid": {
+                              "type": "keyword"
+                          },
+                          "full_name": {
+                              "type": "text",
+                              "analyzer": "ru_en"
+                          }
+                      }
+                  }
+              }
+              },
+         "genres":
+             {
+                 "dynamic": "strict",
+                 "properties": {
+                     "uuid": {
+                         "type": "keyword"
+                     },
+                     "name": {
+                         "type": "text",
+                         "analyzer": "ru_en"
+                     }
+                 }
+             }
+         }
+    )
 
     model_config = SettingsConfigDict(env_prefix='ELASTIC_', env_file='.env')
 
@@ -194,8 +216,8 @@ class ElasticSettings(BaseSettings):
             'hosts': self.es_schema + '://' + self.host + ':' + str(self.port)
         }
 
-    def get_index_settings(self):
-        return {'index': self.index_name, 'mappings': self.index_mappings, 'settings': self.index_settings}
+    def get_index_settings(self, index_name: str):
+        return {'index': index_name, 'mappings': self.indexes_mappings.get(index_name), 'settings': self.indexes_settings}
 
     def get_backoff_settings(self):
         """
