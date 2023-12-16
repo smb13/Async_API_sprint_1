@@ -8,7 +8,7 @@ from settings import elastic_settings
 def elastic_init(es: Elasticsearch):
     logger.info('Initializing ...')
     # Проверяем создан ли индекс в ElasticSearch, если нет, то создаем
-    index_names = (elastic_settings.movies_index_name, elastic_settings.genres_index_name)
+    index_names = ('movies', 'genres', 'persons')
     for index_name in index_names:
         if not es.indices.exists(index=index_name):
             logger.info(f'Creating index {index_name} ...')
