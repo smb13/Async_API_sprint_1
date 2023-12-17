@@ -13,7 +13,7 @@ from state import JsonFileStorage, State
 
 
 def process(pg: psycopg.Connection, es: Elasticsearch):
-    # Паплайн обновления индекса movies
+    # Пайплайн обновления индекса movies
     movies_updater = save_data(index_name='movies', es=es)
     movies_transformer = transform_data(index_name='movies', next_step=movies_updater)
     movies_fetcher = fetch_film_works(pg=pg, next_step=movies_transformer)
@@ -32,14 +32,14 @@ def process(pg: psycopg.Connection, es: Elasticsearch):
                                          table_name='person', next_step=movies_film_works_by_person,
                                          default_is_now=False)
 
-    # Паплайн обновления индекса genres
+    # Пайплайн обновления индекса genres
     genres_updater = save_data(index_name='genres', es=es)
     genres_transformer = transform_data(index_name='genres', next_step=genres_updater)
     genres_fetcher = fetch_genres(pg=pg, next_step=genres_transformer)
     genres_genre_syncer = fetch_changes(pg=pg, index_name='genres',
                                         table_name='genre', next_step=genres_fetcher, default_is_now=False)
 
-    # Паплайн обновления индекса persons
+    # Пайплайн обновления индекса persons
     persons_updater = save_data(index_name='persons', es=es)
     persons_transformer = transform_data(index_name='persons', next_step=persons_updater)
     persons_fetcher = fetch_persons(pg=pg, next_step=persons_transformer)
@@ -53,7 +53,7 @@ def process(pg: psycopg.Connection, es: Elasticsearch):
     # Запускаем цикл проверки обновлений.
     logger.info('Starting ETL process for updates ...')
     while True:
-        # Паплайн обновления индекса movies
+        # Пайплайн обновления индекса movies
         # Проверка обновлений в таблице кинопроизведений.
         movies_film_work_syncer.send(state)
         # Проверка обновлений в таблице жанров.
@@ -61,10 +61,10 @@ def process(pg: psycopg.Connection, es: Elasticsearch):
         # Проверка обновлений в таблице персон.
         movies_person_syncer.send(state)
 
-        # Паплайн обновления индекса genres
+        # Пайплайн обновления индекса genres
         genres_genre_syncer.send(state)
 
-        # Паплайн обновления индекса persons
+        # Пайплайн обновления индекса persons
         persons_person_syncer.send(state)
         persons_film_work_syncer.send(state)
 
