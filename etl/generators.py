@@ -240,7 +240,7 @@ def fetch_persons(
                     	json_agg(
                     	DISTINCT jsonb_build_object(
                           	'films_uuid', fw.id,
-                            'films_roles', pfw.role
+                          	'films_roles', pfw.role
                     	)
                     ) FILTER (WHERE fw.id is not null),
                       '[]'
@@ -250,7 +250,7 @@ def fetch_persons(
                 LEFT JOIN content.film_work fw ON fw.id = pfw.film_work_id
                 WHERE p.id IN (""" + ",".join(['%s' for _ in ids]) + """)
                 GROUP BY p.id
-                """
+            """
             cur.execute(sql, ids)
 
             while results := cur.fetchmany(size=bulk_size):
