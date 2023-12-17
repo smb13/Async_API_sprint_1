@@ -47,7 +47,7 @@ services:
       - ELASTIC_HOST=es
       - ETL_STATE_FILE_PATH=state/storage.json
     volumes:
-#      - ./logs:/opt/app/logs
+      - ./logs:/opt/app/logs
       - etl-data:/opt/app/state
     depends_on:
       postgres:
@@ -64,8 +64,8 @@ services:
       - ELASTIC_HOST=es
       - REDIS_HOST=redis
       - ETL_STATE_FILE_PATH=state/storage.json
-#    volumes:
-#      - ./logs:/opt/app/logs
+    volumes:
+      - ./logs:/opt/app/logs
     # TODO Убрать проброс портов перед сдачей проекта.
     ports:
       - "8000:8000"

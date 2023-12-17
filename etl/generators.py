@@ -11,8 +11,7 @@ from psycopg.rows import dict_row
 from typing_extensions import Union, Type
 
 from logger import logger
-from models import Movie, Genre
-from settings import elastic_settings
+from models import Movie, Genre, Person
 from state import State
 
 
@@ -28,10 +27,12 @@ def coroutine(func):
 
 def get_class_by_index(index_name: str) -> Union[Type[Movie], Type[Genre]]:
     match index_name:
-        case elastic_settings.movies_index_name:
+        case 'movies':
             return Movie
-        case elastic_settings.genres_index_name:
+        case 'genres':
             return Genre
+        case 'persons':
+            return Person
         case _:
             raise RuntimeError('Unprocessable index_name.')
 
@@ -196,17 +197,59 @@ def fetch_genres(
     :param pg: Соединение с бд
     :param next_step: Генератор, используемый на следующем шагу обработки
     :param bulk_size: Максимальное число одновременно обрабатываемых записей
-    :return: Генератор, принимающий на вход список идентификаторов кинопроизведений
+    :return: Генератор, принимающий на вход список идентификаторов жанров
     """
     with ServerCursor(pg, 'genres_enricher', row_factory=dict_row) as cur:
         while ids := (yield):
             logger.info("Fetching genres data")
             sql = """ 
                 SELECT
-                    g.id as genre_uuid,
-                    g.name as genre_name                   
+                    g.id as uuid,
+                    g.name as name                   
                 FROM genre g
                 WHERE g.id IN (""" + ",".join(['%s' for _ in ids]) + """)
+                """
+            cur.execute(sql, ids)
+
+            while results := cur.fetchmany(size=bulk_size):
+                next_step.send(results)
+
+
+@coroutine
+def fetch_persons(
+        pg: psycopg.Connection,
+        next_step: Generator,
+        *,
+        bulk_size: Annotated[int, Gt(0)] = 100
+) -> Generator[None, dict, None]:
+    """
+    Получение данных жанрах
+    :param pg: Соединение с бд
+    :param next_step: Генератор, используемый на следующем шагу обработки
+    :param bulk_size: Максимальное число одновременно обрабатываемых записей
+    :return: Генератор, принимающий на вход список идентификаторов жанров
+    """
+    with ServerCursor(pg, 'persons_enricher', row_factory=dict_row) as cur:
+        while ids := (yield):
+            logger.info("Fetching persons data")
+            sql = """ 
+                SELECT
+                    p.id as uuid,
+                    p.full_name as full_name,
+                    COALESCE (
+                    	json_agg(
+                    	DISTINCT jsonb_build_object(
+                          	'films_uuid', fw.id,
+                            'films_roles', pfw.role
+                    	)
+                    ) FILTER (WHERE fw.id is not null),
+                      '[]'
+                    ) as films
+                FROM content.person p
+                LEFT JOIN content.person_film_work pfw ON pfw.person_id = p.id
+                LEFT JOIN content.film_work fw ON fw.id = pfw.film_work_id
+                WHERE p.id IN (""" + ",".join(['%s' for _ in ids]) + """)
+                GROUP BY p.id
                 """
             cur.execute(sql, ids)
 
