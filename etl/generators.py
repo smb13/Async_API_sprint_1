@@ -127,6 +127,38 @@ def fetch_film_works_ids(
 
 
 @coroutine
+def fetch_person_ids(
+        pg: psycopg.Connection,
+        next_step: Generator,
+        *,
+        bulk_size: Annotated[int, Gt(0)] = 100
+) -> Generator[datetime, State, None]:
+    """
+    Получение идентификаторов всех персон, которые нужно обновить, в связи с изменениями в таблице кинопроизведений.
+    :param pg: Соединение с бд
+    :param next_step: Генератор, используемый на следующем шагу обработки
+    :param bulk_size: Максимальное число одновременно обрабатываемых записей
+    :return: Генератор, принимающий на вход список идентификаторов записей в связанной таблице
+    """
+    while ids := (yield):
+        with ServerCursor(pg, 'fetch_persons_ids', row_factory=dict_row) as cur:
+            logger.info("Fetching persons ids by film_work ids")
+
+            cur.execute(
+                """
+                SELECT p.id as id
+                FROM person p
+                LEFT JOIN person_film_work pfw ON pfw.person_id = p.id
+                LEFT JOIN film_work fw ON fw.id = pfw.film_work_id
+                WHERE fw.id IN (""" + ",".join(['%s' for _ in ids]) + """)
+                """,
+                ids
+            )
+            while results := cur.fetchmany(size=bulk_size):
+                next_step.send([fw['id'] for fw in results])
+
+
+@coroutine
 def fetch_film_works(
         pg: psycopg.Connection,
         next_step: Generator,
@@ -143,16 +175,16 @@ def fetch_film_works(
     with ServerCursor(pg, 'film_works_enricher', row_factory=dict_row) as cur:
         while ids := (yield):
             logger.info("Fetching film_works data")
-            sql = """ 
+            sql = """
                 SELECT
                     fw.id as uuid,
-                    fw.rating, 
-                    fw.title, 
-                    fw.description, 
-                    fw.rating, 
-                    fw.type, 
-                    fw.created_at, 
-                    fw.updated_at, 
+                    fw.rating,
+                    fw.title,
+                    fw.description,
+                    fw.rating,
+                    fw.type,
+                    fw.created_at,
+                    fw.updated_at,
                     COALESCE (
                        json_agg(
                            DISTINCT jsonb_build_object(
@@ -202,10 +234,10 @@ def fetch_genres(
     with ServerCursor(pg, 'genres_enricher', row_factory=dict_row) as cur:
         while ids := (yield):
             logger.info("Fetching genres data")
-            sql = """ 
+            sql = """
                 SELECT
                     g.id as uuid,
-                    g.name as name                   
+                    g.name as name
                 FROM genre g
                 WHERE g.id IN (""" + ",".join(['%s' for _ in ids]) + """)
                 """
@@ -232,25 +264,25 @@ def fetch_persons(
     with ServerCursor(pg, 'persons_enricher', row_factory=dict_row) as cur:
         while ids := (yield):
             logger.info("Fetching persons data")
-            sql = """ 
+            sql = """
                 SELECT
                     p.id as uuid,
                     p.full_name as full_name,
-                    COALESCE (
-                    	json_agg(
-                    	DISTINCT jsonb_build_object(
-                          	'films_uuid', fw.id,
-                            'films_roles', pfw.role
-                    	)
+                        COALESCE (
+                            json_agg(
+                            DISTINCT jsonb_build_object(
+                                'films_uuid', fw.id,
+                                'films_roles', pfw.role
+                            )
                     ) FILTER (WHERE fw.id is not null),
-                      '[]'
+                    '[]'
                     ) as films
                 FROM content.person p
                 LEFT JOIN content.person_film_work pfw ON pfw.person_id = p.id
                 LEFT JOIN content.film_work fw ON fw.id = pfw.film_work_id
                 WHERE p.id IN (""" + ",".join(['%s' for _ in ids]) + """)
                 GROUP BY p.id
-                """
+            """
             cur.execute(sql, ids)
 
             while results := cur.fetchmany(size=bulk_size):

@@ -4,7 +4,7 @@ import psycopg
 from elasticsearch import Elasticsearch
 
 from generators import (fetch_changes, save_data, transform_data, fetch_film_works, fetch_film_works_ids,
-                        fetch_genres, fetch_persons)
+                        fetch_genres, fetch_persons, fetch_person_ids)
 from logger import logger
 from postgres import pg_connect, pg_reconnect
 from elastic import elastic_init, elastic_connect, elastic_reconnect
@@ -43,6 +43,10 @@ def process(pg: psycopg.Connection, es: Elasticsearch):
     persons_updater = save_data(index_name='persons', es=es)
     persons_transformer = transform_data(index_name='persons', next_step=persons_updater)
     persons_fetcher = fetch_persons(pg=pg, next_step=persons_transformer)
+    persons_person_by_film_works = fetch_person_ids(pg=pg, next_step=persons_fetcher)
+    persons_film_work_syncer = fetch_changes(pg=pg, index_name='persons',
+                                             table_name='film_work', next_step=persons_person_by_film_works,
+                                             default_is_now=False)
     persons_person_syncer = fetch_changes(pg=pg, index_name='persons',
                                           table_name='person', next_step=persons_fetcher, default_is_now=False)
 
@@ -62,6 +66,7 @@ def process(pg: psycopg.Connection, es: Elasticsearch):
 
         # Паплайн обновления индекса persons
         persons_person_syncer.send(state)
+        persons_film_work_syncer.send(state)
 
         # Приостановка.
         sleep(etl_settings.timeout)

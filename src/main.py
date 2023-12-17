@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
 from redis.asyncio import Redis
 
-from api.v1 import films
+from api.v1 import films, genres, persons
 from core import config
 from core.logger import LOGGING
 from db import elastic, redisdb as redis
@@ -48,6 +48,12 @@ app = FastAPI(
 
 # Подключаем роутер к серверу с указанием префикса для API (/v1/films).
 app.include_router(films.router, prefix='/api/v1/films', tags=['Films'])
+
+# Подключаем роутер к серверу с указанием префикса для API (/v1/genres).
+app.include_router(genres.router, prefix='/api/v1/genres', tags=['Genres'])
+
+# Подключаем роутер к серверу с указанием префикса для API (/v1/persons).
+app.include_router(persons.router, prefix='/api/v1/persons', tags=['Persons'])
 
 if __name__ == '__main__':
     # Запускаем приложение с помощью uvicorn сервера.

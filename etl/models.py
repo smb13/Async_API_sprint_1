@@ -23,7 +23,7 @@ class _Genre(BaseModel):
         return self.model_dump()
 
 
-class _Films(BaseModel):
+class PersonFilms(BaseModel):
     uuid: UUID
     roles: str
 
@@ -36,7 +36,7 @@ class _Films(BaseModel):
 class Person(BaseModel):
     uuid: UUID
     full_name: str
-    films: list[_Films]
+    films: list[PersonFilms]
 
     def films_to_elastic(self):
         uuids = set(n.uuid for n in self.films)
