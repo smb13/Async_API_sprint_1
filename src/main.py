@@ -1,23 +1,20 @@
-import logging
 from contextlib import asynccontextmanager
 
-import uvicorn
 from elasticsearch import AsyncElasticsearch
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
 from redis.asyncio import Redis
 
 from api.v1 import films, genres, persons
-from core import config
-from core.logger import LOGGING
+from core.config import redis_settings, elastic_settings, project_settings
 from db import elastic, redisdb as redis
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     # Создаем подключение к базам при старте сервера.
-    redis.redis = Redis(host=config.REDIS_HOST, port=config.REDIS_PORT)
-    elastic.es = AsyncElasticsearch(hosts=[f'http://{config.ELASTIC_HOST}:{config.ELASTIC_PORT}'])
+    redis.redis = Redis(host=redis_settings.host, port=redis_settings.port)
+    elastic.es = AsyncElasticsearch(hosts=[f'http://{elastic_settings.host}:{elastic_settings.port}'])
 
     # Проверяем соединения с базами.
     await redis.redis.ping()
@@ -32,7 +29,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     # Название проекта, используемое в документации.
-    title=config.PROJECT_NAME,
+    title=project_settings.name,
     # Адрес документации (swagger).
     docs_url='/api/openapi',
     # Адрес документации (openapi).
@@ -56,11 +53,4 @@ app.include_router(genres.router, prefix='/api/v1/genres', tags=['Genres'])
 app.include_router(persons.router, prefix='/api/v1/persons', tags=['Persons'])
 
 if __name__ == '__main__':
-    # Запускаем приложение с помощью uvicorn сервера.
-    uvicorn.run(
-        'main:app',
-        host='0.0.0.0',
-        port=8000,
-        log_config=LOGGING,
-        log_level=logging.DEBUG,
-    )
+    pass
