@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import List, Annotated
+from typing import Annotated
 from uuid import UUID, uuid4
 
 from annotated_types import Gt, Le
@@ -20,7 +20,7 @@ class PersonFilms(BaseModel):
     uuid: UUID = Field(
         ..., description='Идентификатор фильма', example=uuid4()
     )
-    roles: List[str] = Field(
+    roles: list[str] = Field(
         ..., description='Список ролей персоны в фильме', example='["writer", "director"]'
     )
 
@@ -56,14 +56,14 @@ async def person_details(
     return Person(**person.model_dump())
 
 
-@router.get('/{person_id}/film/', response_model=List[Film],
+@router.get('/{person_id}/film/', response_model=list[Film],
             description='Получение списка фильмов по персоне', name='Получение списка фильмов по персоне')
 async def films_by_person(
         person_id: UUID = Path(..., description='Идентификатор персоны',
                                example='bdf146ce-d0f4-44be-8bde-4834573e18a7'),
         person_service: PersonService = Depends(get_person_service),
         film_service: FilmService = Depends(get_film_service)
-) -> List[Film]:
+) -> list[Film]:
     person = await person_service.get_by_id(person_id)
     if not person:
         # Если персона не найдена, отдаём 404 статус
@@ -77,14 +77,14 @@ async def films_by_person(
     return list(map(lambda film: Film(**film.model_dump()), films))
 
 
-@router.get('/search/', response_model=List[Person],
+@router.get('/search/', response_model=list[Person],
             description='Поиск персоналий', name='Поиск персоналий')
 async def persons_search(
         query: Annotated[str, Query(description='строка поиска', example='Clooney')] = None,
         page_size: Annotated[int, Query(description='Число элементов на странице'), Gt(0), Le(100)] = 50,
         page_number: Annotated[int, Query(description='Номер страницы '), Gt(0)] = 1,
         person_service: PersonService = Depends(get_person_service)
-) -> List[Person]:
+) -> list[Person]:
     persons = await person_service.get_persons(query=query, page=page_number, per_page=page_size)
     if not persons:
         # Если ни один фильм не найден, отдаём 404 статус

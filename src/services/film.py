@@ -1,6 +1,5 @@
 import orjson
 from functools import lru_cache
-from typing import List
 
 from elasticsearch import AsyncElasticsearch, NotFoundError
 from fastapi import Depends
@@ -40,7 +39,7 @@ class FilmService:
     async def get_films(
             self, *, sort: str | None, genre: str | None = None,
             page: int | None = 1, per_page: int | None = 1, query: str | None = None
-    ) -> List[Film]:
+    ) -> list[Film]:
         # Пытаемся получить данные из кеша, потому что оно работает быстрее.
         films = await self._films_list_from_cache(sort=sort, genre=genre, page=page, per_page=per_page, query=query)
         if not films:
@@ -67,7 +66,7 @@ class FilmService:
     async def _get_films_list_from_elastic(
             self, *, sort: str | None, genre: str | None,
             page: int | None = 1, per_page: int | None = 1, film: str | None = None
-    ) -> List[Film] | None:
+    ) -> list[Film] | None:
         # Проверка аргументов.
         if page <= 0:
             page = 1
@@ -101,7 +100,7 @@ class FilmService:
         film = Film.model_validate_json(data)
         return film
 
-    async def _films_list_from_cache(self, **kwargs) -> List[Film] | None:
+    async def _films_list_from_cache(self, **kwargs) -> list[Film] | None:
         # Пытаемся получить данные о фильме из кеша, используя команду get https://redis.io/commands/get/
         data = await self.redis.get(orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS))
         if not data:
@@ -113,7 +112,7 @@ class FilmService:
         # Сохраняем данные о фильме в кэше, указывая время жизни.
         await self.redis.set(str(film.uuid), film.model_dump_json(), FILM_CACHE_EXPIRE_IN_SECONDS)
 
-    async def _put_films_list_to_cache(self, films: List[Film], **kwargs):
+    async def _put_films_list_to_cache(self, films: list[Film], **kwargs):
         await self.redis.set(
             orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS),
             orjson.dumps([ob.model_dump_json() for ob in films]),

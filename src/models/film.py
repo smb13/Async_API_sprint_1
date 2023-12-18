@@ -1,4 +1,4 @@
-from typing import List, Annotated
+from typing import Annotated
 from uuid import UUID
 
 from annotated_types import MinLen, IsNotNan, Ge
@@ -17,7 +17,7 @@ class PersonFilms(BaseModel):
     """Фильм, в котором принимала участия указанная персона"""
     uuid: UUID
     """Идентификатор фильма (UUID)"""
-    roles: List[str]
+    roles: list[str]
     """Список ролей персоны в фильме"""
 
 
@@ -27,7 +27,7 @@ class Person(BaseModel):
     """Идентификатор персоны (UUID)"""
     full_name: Annotated[str, IsNotNan, MinLen(1)]
     """Полное имя персоны"""
-    films: List[PersonFilms] | None = []
+    films: list[PersonFilms] | None = []
     """Фильмы, в которых принимала участия указанная персона"""
 
 
@@ -41,11 +41,11 @@ class Film(BaseModel):
     """Рейтинг фильма"""
     description: str | None
     """Описание фильма"""
-    genre: List[Genre]
+    genre: list[Genre]
     """Жанры фильма"""
-    actors: List[Person] | None
+    actors: list[Person] | None
     """Актеры, учавствовавшие в фильме"""
-    writers: List[Person] | None
+    writers: list[Person] | None
     """Сценаристы фильма"""
-    directors: List[Person] | None
+    directors: list[Person] | None
     """Режиссеры фильма"""

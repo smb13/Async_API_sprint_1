@@ -1,6 +1,5 @@
 import orjson
 from functools import lru_cache
-from typing import List
 
 from elasticsearch import AsyncElasticsearch, NotFoundError
 from fastapi import Depends
@@ -41,7 +40,7 @@ class PersonService:
     async def get_persons(
             self, *, page: int | None = 1,
             per_page: int | None = 1, query: str | None = None
-    ) -> List[Person]:
+    ) -> list[Person]:
         # Пытаемся получить данные из кеша, потому что оно работает быстрее.
         persons = await self._persons_list_from_cache(page=page, per_page=per_page, query=query)
         if not persons:
@@ -67,7 +66,7 @@ class PersonService:
 
     async def _get_persons_list_from_elastic(
             self, *, page: int | None = 1, per_page: int | None = 1, person: str | None = None
-    ) -> List[Person] | None:
+    ) -> list[Person] | None:
         # Проверка аргументов.
         if page <= 0:
             page = 1
@@ -96,7 +95,7 @@ class PersonService:
         person = Person.model_validate_json(data)
         return person
 
-    async def _persons_list_from_cache(self, **kwargs) -> List[Person] | None:
+    async def _persons_list_from_cache(self, **kwargs) -> list[Person] | None:
         # Пытаемся получить данные о персоне из кеша, используя команду get https://redis.io/commands/get/
         data = await self.redis.get(orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS))
         if not data:
@@ -108,7 +107,7 @@ class PersonService:
         # Сохраняем данные о персоне в кэше, указывая время жизни.
         await self.redis.set(str(person.uuid), person.model_dump_json(), PERSON_CACHE_EXPIRE_IN_SECONDS)
 
-    async def _put_persons_list_to_cache(self, persons: List[Person], **kwargs):
+    async def _put_persons_list_to_cache(self, persons: list[Person], **kwargs):
         await self.redis.set(
             orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS),
             orjson.dumps([ob.model_dump_json() for ob in persons]),

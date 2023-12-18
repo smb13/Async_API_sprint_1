@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import List, Annotated
+from typing import Annotated
 from uuid import UUID, uuid4
 
 from annotated_types import Gt, Le
@@ -53,7 +53,7 @@ class FilmDetails(Film):
                 "Millennium Falcon, work together with the companionable droid duo R2-D2 and C-3PO to rescue the"
                 "beautiful princess, help the Rebel Alliance and restore freedom and justice to the Galaxy."
     )
-    genre: List[Genre] = Field(
+    genre: list[Genre] = Field(
         ..., description='Жанры',
         examples=[[
             {'id': '120a21cf-9097-479e-904a-13dd7198c1dd', 'name': 'Adventure'},
@@ -62,7 +62,7 @@ class FilmDetails(Film):
             {'id': 'b92ef010-5e4c-4fd0-99d6-41b6456272cd', 'name': 'Fantasy'}
         ]]
     )
-    actors: List[Person] = Field(
+    actors: list[Person] = Field(
         ..., description='Актеры',
         examples=[[
             {'id': '26e83050-29ef-4163-a99d-b546cac208f8', 'name': 'Mark Hamill'},
@@ -71,11 +71,11 @@ class FilmDetails(Film):
             {'id': 'e039eedf-4daf-452a-bf92-a0085c68e156', 'name': 'Peter Cushing'}
         ]]
     )
-    writers: List[Person] = Field(
+    writers: list[Person] = Field(
         ..., description='Сценаристы',
         examples=[[{'id': 'a5a8f573-3cee-4ccc-8a2b-91cb9f55250a', 'name': 'George Lucas'}]]
     )
-    directors: List[Person] = Field(
+    directors: list[Person] = Field(
         ..., description='Режисеры',
         examples=[[{'id': 'a5a8f573-3cee-4ccc-8a2b-91cb9f55250a', 'name': 'George Lucas'}]]
     )
@@ -98,7 +98,7 @@ async def film_details(
     return FilmDetails(**film.model_dump())
 
 
-@router.get('/', response_model=List[Film],
+@router.get('/', response_model=list[Film],
             description='Получение списка фильмов', name='Получение списка фильмов')
 async def films_list(
         genre: Annotated[str, Query(description='Фильтр по жанрам', example='Drama')] = None,
@@ -106,7 +106,7 @@ async def films_list(
         page_size: Annotated[int, Query(description='Число элементов на странице'), Gt(0), Le(100)] = 50,
         page_number: Annotated[int, Query(description='Номер страницы '), Gt(0)] = 1,
         film_service: FilmService = Depends(get_film_service)
-) -> List[Film]:
+) -> list[Film]:
     films = await film_service.get_films(sort=sort, genre=genre, page=page_number, per_page=page_size)
     if not films:
         # Если ни один фильм не найден, отдаём 404 статус
@@ -116,7 +116,7 @@ async def films_list(
     return list(map(lambda film: Film(**film.model_dump()), films))
 
 
-@router.get('/search/', response_model=List[Film],
+@router.get('/search/', response_model=list[Film],
             description='Поиск фильмов', name='Поиск фильмов')
 async def films_search(
         query: Annotated[str, Query(description='строка поиска', example='Star')] = None,
@@ -124,7 +124,7 @@ async def films_search(
         page_size: Annotated[int, Query(description='Число элементов на странице'), Gt(0), Le(100)] = 50,
         page_number: Annotated[int, Query(description='Номер страницы '), Gt(0)] = 1,
         film_service: FilmService = Depends(get_film_service)
-) -> List[Film]:
+) -> list[Film]:
     films = await film_service.get_films(sort=sort, query=query, page=page_number, per_page=page_size)
     if not films:
         # Если ни один фильм не найден, отдаём 404 статус
