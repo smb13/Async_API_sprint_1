@@ -1,6 +1,5 @@
 import orjson
 from functools import lru_cache
-from typing import Optional, List
 
 from elasticsearch import AsyncElasticsearch, NotFoundError
 from fastapi import Depends
@@ -24,7 +23,7 @@ class PersonService:
         self.elastic = elastic
 
     # Get_by_id возвращает объект персоны. Он опционален, так как персона может отсутствовать в базе
-    async def get_by_id(self, person_id: UUID4) -> Optional[Person]:
+    async def get_by_id(self, person_id: UUID4) -> Person | None:
         # Пытаемся получить данные из кеша, потому что оно работает быстрее
         person = await self._person_from_cache(person_id)
         if not person:
@@ -41,7 +40,7 @@ class PersonService:
     async def get_persons(
             self, *, page: int | None = 1,
             per_page: int | None = 1, query: str | None = None
-    ) -> List[Person]:
+    ) -> list[Person]:
         # Пытаемся получить данные из кеша, потому что оно работает быстрее.
         persons = await self._persons_list_from_cache(page=page, per_page=per_page, query=query)
         if not persons:
@@ -58,7 +57,7 @@ class PersonService:
 
         return persons
 
-    async def _get_person_from_elastic(self, person_id: UUID4) -> Optional[Person]:
+    async def _get_person_from_elastic(self, person_id: UUID4) -> Person | None:
         try:
             doc = await self.elastic.get(index='persons', id=person_id)
         except NotFoundError:
@@ -67,7 +66,7 @@ class PersonService:
 
     async def _get_persons_list_from_elastic(
             self, *, page: int | None = 1, per_page: int | None = 1, person: str | None = None
-    ) -> Optional[List[Person]]:
+    ) -> list[Person] | None:
         # Проверка аргументов.
         if page <= 0:
             page = 1
@@ -87,18 +86,18 @@ class PersonService:
             return None
         return list(map(lambda flm: Person(**flm['_source']), doc['hits']['hits']))
 
-    async def _person_from_cache(self, person_id: UUID4) -> Optional[Person]:
+    async def _person_from_cache(self, person_id: UUID4) -> Person | None:
         # Пытаемся получить данные о персоне из кеша, используя команду get https://redis.io/commands/get/
-        data = await self.redis.get(str(person_id))
+        data = await self.redis.get("person:" + str(person_id))
         if not data:
             return None
 
         person = Person.model_validate_json(data)
         return person
 
-    async def _persons_list_from_cache(self, **kwargs) -> Optional[List[Person]]:
+    async def _persons_list_from_cache(self, **kwargs) -> list[Person] | None:
         # Пытаемся получить данные о персоне из кеша, используя команду get https://redis.io/commands/get/
-        data = await self.redis.get(orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS))
+        data = await self.redis.get("persons:" + orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS).decode("utf-8"))
         if not data:
             return None
 
@@ -106,11 +105,11 @@ class PersonService:
 
     async def _put_person_to_cache(self, person: Person):
         # Сохраняем данные о персоне в кэше, указывая время жизни.
-        await self.redis.set(str(person.uuid), person.model_dump_json(), PERSON_CACHE_EXPIRE_IN_SECONDS)
+        await self.redis.set("person:" + str(person.uuid), person.model_dump_json(), PERSON_CACHE_EXPIRE_IN_SECONDS)
 
-    async def _put_persons_list_to_cache(self, persons: List[Person], **kwargs):
+    async def _put_persons_list_to_cache(self, persons: list[Person], **kwargs):
         await self.redis.set(
-            orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS),
+            "persons:" + orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS).decode("utf-8"),
             orjson.dumps([ob.model_dump_json() for ob in persons]),
             PERSON_CACHE_EXPIRE_IN_SECONDS
         )

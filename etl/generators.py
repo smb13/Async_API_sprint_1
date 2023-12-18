@@ -8,7 +8,6 @@ from annotated_types import Gt
 from elasticsearch import Elasticsearch
 from psycopg import ServerCursor
 from psycopg.rows import dict_row
-from typing_extensions import Union, Type
 
 from logger import logger
 from models import Movie, Genre, Person
@@ -25,7 +24,7 @@ def coroutine(func):
     return inner
 
 
-def get_class_by_index(index_name: str) -> Union[Type[Movie], Type[Genre]]:
+def get_class_by_index(index_name: str) -> type(Movie) | type(Genre) | type(Person):
     match index_name:
         case 'movies':
             return Movie
@@ -313,7 +312,7 @@ def transform_data(index_name: str,
 def save_data(
         index_name: str,
         es: Elasticsearch
-) -> Generator[None, list[Union[Movie, Genre]], None]:
+) -> Generator[None, list[Movie | Genre], None]:
     """
     Обновление индекса в elasticsearch
     :param  index_name: имя индекса

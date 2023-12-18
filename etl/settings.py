@@ -1,5 +1,4 @@
 import logging
-from typing import Union
 
 import backoff
 import elastic_transport
@@ -13,7 +12,7 @@ class ETLSettings(BaseSettings):
     timeout: int = Field(60)
     state_file_path: str = Field('storage.json')
     logger_name: str = Field('etl_application')
-    logger_level: Union[int, str] = Field(logging.INFO)
+    logger_level: int | str = Field(logging.INFO)
     logger_file: str = Field('logs/etl_logs.log')
     logger_file_max_bytes: int = Field(20_000_000)
     logger_file_backup_count: int = Field(5)
@@ -41,7 +40,8 @@ class PostgresSettings(BaseSettings):
         """
         return {'conninfo': self.get_dsn(), 'options': f"-c search_path={self.pg_schema},public"}
 
-    def get_backoff_settings(self):
+    @staticmethod
+    def get_backoff_settings():
         """
         Получение настроек для backoff логики установки соединения с базой Postgres.
 
@@ -245,7 +245,8 @@ class ElasticSettings(BaseSettings):
         return {'index': index_name, 'mappings': self.indexes_mappings.get(index_name),
                 'settings': self.indexes_settings}
 
-    def get_backoff_settings(self):
+    @staticmethod
+    def get_backoff_settings():
         """
         Получение настроек для backoff логики установки соединения с базой Postgres.
 

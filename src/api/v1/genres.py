@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import List, Annotated
+from typing import Annotated
 from uuid import UUID, uuid4
 
 from annotated_types import Gt, Le
@@ -38,13 +38,13 @@ async def genre_details(
     return Genre(**genre.model_dump())
 
 
-@router.get('/', response_model=List[Genre],
+@router.get('/', response_model=list[Genre],
             description='Получение списка жанров', name='Получение списка жанров')
 async def genres_list(
         page_size: Annotated[int, Query(description='Число элементов на странице'), Gt(0), Le(100)] = 50,
         page_number: Annotated[int, Query(description='Номер страницы '), Gt(0)] = 1,
         genre_service: GenreService = Depends(get_genre_service)
-) -> List[Genre]:
+) -> list[Genre]:
     genres = await genre_service.get_genres(page=page_number, per_page=page_size)
     if not genres:
         # Если ни один фильм не найден, отдаём 404 статус

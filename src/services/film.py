@@ -1,6 +1,5 @@
 import orjson
 from functools import lru_cache
-from typing import Optional, List
 
 from elasticsearch import AsyncElasticsearch, NotFoundError
 from fastapi import Depends
@@ -23,7 +22,7 @@ class FilmService:
         self.elastic = elastic
 
     # Get_by_id возвращает объект фильма. Он опционален, так как фильм может отсутствовать в базе
-    async def get_by_id(self, film_id: UUID4) -> Optional[Film]:
+    async def get_by_id(self, film_id: UUID4) -> Film | None:
         # Пытаемся получить данные из кеша, потому что оно работает быстрее
         film = await self._film_from_cache(film_id)
         if not film:
@@ -40,7 +39,7 @@ class FilmService:
     async def get_films(
             self, *, sort: str | None, genre: str | None = None,
             page: int | None = 1, per_page: int | None = 1, query: str | None = None
-    ) -> List[Film]:
+    ) -> list[Film]:
         # Пытаемся получить данные из кеша, потому что оно работает быстрее.
         films = await self._films_list_from_cache(sort=sort, genre=genre, page=page, per_page=per_page, query=query)
         if not films:
@@ -57,7 +56,7 @@ class FilmService:
 
         return films
 
-    async def _get_film_from_elastic(self, film_id: UUID4) -> Optional[Film]:
+    async def _get_film_from_elastic(self, film_id: UUID4) -> Film | None:
         try:
             doc = await self.elastic.get(index='movies', id=film_id)
         except NotFoundError:
@@ -67,7 +66,7 @@ class FilmService:
     async def _get_films_list_from_elastic(
             self, *, sort: str | None, genre: str | None,
             page: int | None = 1, per_page: int | None = 1, film: str | None = None
-    ) -> Optional[List[Film]]:
+    ) -> list[Film] | None:
         # Проверка аргументов.
         if page <= 0:
             page = 1
@@ -92,18 +91,18 @@ class FilmService:
             return None
         return list(map(lambda flm: Film(**flm['_source']), doc['hits']['hits']))
 
-    async def _film_from_cache(self, film_id: UUID4) -> Optional[Film]:
+    async def _film_from_cache(self, film_id: UUID4) -> Film | None:
         # Пытаемся получить данные о фильме из кеша, используя команду get https://redis.io/commands/get/
-        data = await self.redis.get(str(film_id))
+        data = await self.redis.get("movie:" + str(film_id))
         if not data:
             return None
 
         film = Film.model_validate_json(data)
         return film
 
-    async def _films_list_from_cache(self, **kwargs) -> Optional[List[Film]]:
+    async def _films_list_from_cache(self, **kwargs) -> list[Film] | None:
         # Пытаемся получить данные о фильме из кеша, используя команду get https://redis.io/commands/get/
-        data = await self.redis.get(orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS))
+        data = await self.redis.get("movies:" + orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS).decode('utf-8'))
         if not data:
             return None
 
@@ -111,11 +110,11 @@ class FilmService:
 
     async def _put_film_to_cache(self, film: Film):
         # Сохраняем данные о фильме в кэше, указывая время жизни.
-        await self.redis.set(str(film.uuid), film.model_dump_json(), FILM_CACHE_EXPIRE_IN_SECONDS)
+        await self.redis.set("movie:" + str(film.uuid), film.model_dump_json(), FILM_CACHE_EXPIRE_IN_SECONDS)
 
-    async def _put_films_list_to_cache(self, films: List[Film], **kwargs):
+    async def _put_films_list_to_cache(self, films: list[Film], **kwargs):
         await self.redis.set(
-            orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS),
+            "movies:" + orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS).decode('utf-8'),
             orjson.dumps([ob.model_dump_json() for ob in films]),
             FILM_CACHE_EXPIRE_IN_SECONDS
         )
