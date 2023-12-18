@@ -2,7 +2,7 @@
 LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 LOG_DEFAULT_HANDLERS = ['console', ]
 
-# В логгере настраивается логгирование uvicorn-сервера.
+# В логгере настраивается логгирование gunicorn-сервера.
 # Про логирование в Python можно прочитать в документации
 # https://docs.python.org/3/howto/logging.html
 # https://docs.python.org/3/howto/logging-cookbook.html
@@ -16,13 +16,13 @@ LOGGING = {
             'format': LOG_FORMAT
         },
         'default': {
-            '()': 'uvicorn.logging.DefaultFormatter',
-            'fmt': '%(levelprefix)s %(message)s',
-            'use_colors': None,
+            "format": "%(asctime)s [%(process)d] [%(levelname)s] %(message)s",
+            "datefmt": "[%Y-%m-%d %H:%M:%S %z]",
+            "class": "logging.Formatter"
         },
         'access': {
-            '()': 'uvicorn.logging.AccessFormatter',
-            'fmt': "%(levelprefix)s %(client_addr)s - '%(request_line)s' %(status_code)s",
+            'format': "%(message)s",
+            'class': 'logging.Formatter'
         },
     },
     'handlers': {
@@ -47,10 +47,10 @@ LOGGING = {
             'handlers': LOG_DEFAULT_HANDLERS,
             'level': 'INFO',
         },
-        'uvicorn.error': {
+        'gunicorn.error': {
             'level': 'INFO',
         },
-        'uvicorn.access': {
+        'gunicorn.access': {
             'handlers': ['access'],
             'level': 'INFO',
             'propagate': False,

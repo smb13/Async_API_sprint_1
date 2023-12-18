@@ -33,9 +33,10 @@ COPY db ${ROOTDIR}/db
 COPY models ${ROOTDIR}/models
 COPY services ${ROOTDIR}/services
 COPY main.py ${ROOTDIR}/
+COPY gunicorn.conf.py ${ROOTDIR}/
 
 USER ${USERNAME}
 
 EXPOSE 8000
 
-CMD [ "python", "main.py" ]
+CMD [ "gunicorn", "main:app" ]
