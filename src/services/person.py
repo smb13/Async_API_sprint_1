@@ -88,7 +88,7 @@ class PersonService:
 
     async def _person_from_cache(self, person_id: UUID4) -> Person | None:
         # Пытаемся получить данные о персоне из кеша, используя команду get https://redis.io/commands/get/
-        data = await self.redis.get(str(person_id))
+        data = await self.redis.get("person:" + str(person_id))
         if not data:
             return None
 
@@ -97,7 +97,7 @@ class PersonService:
 
     async def _persons_list_from_cache(self, **kwargs) -> list[Person] | None:
         # Пытаемся получить данные о персоне из кеша, используя команду get https://redis.io/commands/get/
-        data = await self.redis.get(orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS))
+        data = await self.redis.get("persons:" + orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS).decode("utf-8"))
         if not data:
             return None
 
@@ -105,11 +105,11 @@ class PersonService:
 
     async def _put_person_to_cache(self, person: Person):
         # Сохраняем данные о персоне в кэше, указывая время жизни.
-        await self.redis.set(str(person.uuid), person.model_dump_json(), PERSON_CACHE_EXPIRE_IN_SECONDS)
+        await self.redis.set("person:" + str(person.uuid), person.model_dump_json(), PERSON_CACHE_EXPIRE_IN_SECONDS)
 
     async def _put_persons_list_to_cache(self, persons: list[Person], **kwargs):
         await self.redis.set(
-            orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS),
+            "persons:" + orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS).decode("utf-8"),
             orjson.dumps([ob.model_dump_json() for ob in persons]),
             PERSON_CACHE_EXPIRE_IN_SECONDS
         )

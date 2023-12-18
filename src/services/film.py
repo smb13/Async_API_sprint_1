@@ -93,7 +93,7 @@ class FilmService:
 
     async def _film_from_cache(self, film_id: UUID4) -> Film | None:
         # Пытаемся получить данные о фильме из кеша, используя команду get https://redis.io/commands/get/
-        data = await self.redis.get(str(film_id))
+        data = await self.redis.get("movie:" + str(film_id))
         if not data:
             return None
 
@@ -102,7 +102,7 @@ class FilmService:
 
     async def _films_list_from_cache(self, **kwargs) -> list[Film] | None:
         # Пытаемся получить данные о фильме из кеша, используя команду get https://redis.io/commands/get/
-        data = await self.redis.get(orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS))
+        data = await self.redis.get("movies:" + orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS).decode('utf-8'))
         if not data:
             return None
 
@@ -110,11 +110,11 @@ class FilmService:
 
     async def _put_film_to_cache(self, film: Film):
         # Сохраняем данные о фильме в кэше, указывая время жизни.
-        await self.redis.set(str(film.uuid), film.model_dump_json(), FILM_CACHE_EXPIRE_IN_SECONDS)
+        await self.redis.set("movie:" + str(film.uuid), film.model_dump_json(), FILM_CACHE_EXPIRE_IN_SECONDS)
 
     async def _put_films_list_to_cache(self, films: list[Film], **kwargs):
         await self.redis.set(
-            orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS),
+            "movies:" + orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS).decode('utf-8'),
             orjson.dumps([ob.model_dump_json() for ob in films]),
             FILM_CACHE_EXPIRE_IN_SECONDS
         )

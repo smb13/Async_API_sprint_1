@@ -82,7 +82,7 @@ class GenreService:
 
     async def _genre_from_cache(self, genre_id: UUID4) -> Genre | None:
         # Пытаемся получить данные о жанре из кеша, используя команду get https://redis.io/commands/get/
-        data = await self.redis.get(str(genre_id))
+        data = await self.redis.get("genre:" + str(genre_id))
         if not data:
             return None
 
@@ -91,7 +91,7 @@ class GenreService:
 
     async def _genres_list_from_cache(self, **kwargs) -> list[Genre] | None:
         # Пытаемся получить данные о жанре из кеша, используя команду get https://redis.io/commands/get/
-        data = await self.redis.get(orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS))
+        data = await self.redis.get("genres:" + orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS).decode("utf-8"))
         if not data:
             return None
 
@@ -99,11 +99,11 @@ class GenreService:
 
     async def _put_genre_to_cache(self, genre: Genre):
         # Сохраняем данные о жанре в кэше, указывая время жизни.
-        await self.redis.set(str(genre.uuid), genre.model_dump_json(), GENRE_CACHE_EXPIRE_IN_SECONDS)
+        await self.redis.set("genre:" + str(genre.uuid), genre.model_dump_json(), GENRE_CACHE_EXPIRE_IN_SECONDS)
 
     async def _put_genres_list_to_cache(self, genres: list[Genre], **kwargs):
         await self.redis.set(
-            orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS),
+            "genres:" + orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS).decode("utf-8"),
             orjson.dumps([ob.model_dump_json() for ob in genres]),
             GENRE_CACHE_EXPIRE_IN_SECONDS
         )
