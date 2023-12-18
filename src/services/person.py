@@ -1,6 +1,6 @@
 import orjson
 from functools import lru_cache
-from typing import Optional, List
+from typing import List
 
 from elasticsearch import AsyncElasticsearch, NotFoundError
 from fastapi import Depends
@@ -24,7 +24,7 @@ class PersonService:
         self.elastic = elastic
 
     # Get_by_id возвращает объект персоны. Он опционален, так как персона может отсутствовать в базе
-    async def get_by_id(self, person_id: UUID4) -> Optional[Person]:
+    async def get_by_id(self, person_id: UUID4) -> Person | None:
         # Пытаемся получить данные из кеша, потому что оно работает быстрее
         person = await self._person_from_cache(person_id)
         if not person:
@@ -58,7 +58,7 @@ class PersonService:
 
         return persons
 
-    async def _get_person_from_elastic(self, person_id: UUID4) -> Optional[Person]:
+    async def _get_person_from_elastic(self, person_id: UUID4) -> Person | None:
         try:
             doc = await self.elastic.get(index='persons', id=person_id)
         except NotFoundError:
@@ -67,7 +67,7 @@ class PersonService:
 
     async def _get_persons_list_from_elastic(
             self, *, page: int | None = 1, per_page: int | None = 1, person: str | None = None
-    ) -> Optional[List[Person]]:
+    ) -> List[Person] | None:
         # Проверка аргументов.
         if page <= 0:
             page = 1
@@ -87,7 +87,7 @@ class PersonService:
             return None
         return list(map(lambda flm: Person(**flm['_source']), doc['hits']['hits']))
 
-    async def _person_from_cache(self, person_id: UUID4) -> Optional[Person]:
+    async def _person_from_cache(self, person_id: UUID4) -> Person | None:
         # Пытаемся получить данные о персоне из кеша, используя команду get https://redis.io/commands/get/
         data = await self.redis.get(str(person_id))
         if not data:
@@ -96,7 +96,7 @@ class PersonService:
         person = Person.model_validate_json(data)
         return person
 
-    async def _persons_list_from_cache(self, **kwargs) -> Optional[List[Person]]:
+    async def _persons_list_from_cache(self, **kwargs) -> List[Person] | None:
         # Пытаемся получить данные о персоне из кеша, используя команду get https://redis.io/commands/get/
         data = await self.redis.get(orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS))
         if not data:

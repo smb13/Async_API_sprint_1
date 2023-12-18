@@ -41,7 +41,8 @@ class PostgresSettings(BaseSettings):
         """
         return {'conninfo': self.get_dsn(), 'options': f"-c search_path={self.pg_schema},public"}
 
-    def get_backoff_settings(self):
+    @staticmethod
+    def get_backoff_settings():
         """
         Получение настроек для backoff логики установки соединения с базой Postgres.
 
@@ -245,7 +246,8 @@ class ElasticSettings(BaseSettings):
         return {'index': index_name, 'mappings': self.indexes_mappings.get(index_name),
                 'settings': self.indexes_settings}
 
-    def get_backoff_settings(self):
+    @staticmethod
+    def get_backoff_settings():
         """
         Получение настроек для backoff логики установки соединения с базой Postgres.
 

@@ -1,6 +1,6 @@
 import orjson
 from functools import lru_cache
-from typing import Optional, List
+from typing import List
 
 from elasticsearch import AsyncElasticsearch, NotFoundError
 from fastapi import Depends
@@ -23,7 +23,7 @@ class FilmService:
         self.elastic = elastic
 
     # Get_by_id возвращает объект фильма. Он опционален, так как фильм может отсутствовать в базе
-    async def get_by_id(self, film_id: UUID4) -> Optional[Film]:
+    async def get_by_id(self, film_id: UUID4) -> Film | None:
         # Пытаемся получить данные из кеша, потому что оно работает быстрее
         film = await self._film_from_cache(film_id)
         if not film:
@@ -57,7 +57,7 @@ class FilmService:
 
         return films
 
-    async def _get_film_from_elastic(self, film_id: UUID4) -> Optional[Film]:
+    async def _get_film_from_elastic(self, film_id: UUID4) -> Film | None:
         try:
             doc = await self.elastic.get(index='movies', id=film_id)
         except NotFoundError:
@@ -67,7 +67,7 @@ class FilmService:
     async def _get_films_list_from_elastic(
             self, *, sort: str | None, genre: str | None,
             page: int | None = 1, per_page: int | None = 1, film: str | None = None
-    ) -> Optional[List[Film]]:
+    ) -> List[Film] | None:
         # Проверка аргументов.
         if page <= 0:
             page = 1
@@ -92,7 +92,7 @@ class FilmService:
             return None
         return list(map(lambda flm: Film(**flm['_source']), doc['hits']['hits']))
 
-    async def _film_from_cache(self, film_id: UUID4) -> Optional[Film]:
+    async def _film_from_cache(self, film_id: UUID4) -> Film | None:
         # Пытаемся получить данные о фильме из кеша, используя команду get https://redis.io/commands/get/
         data = await self.redis.get(str(film_id))
         if not data:
@@ -101,7 +101,7 @@ class FilmService:
         film = Film.model_validate_json(data)
         return film
 
-    async def _films_list_from_cache(self, **kwargs) -> Optional[List[Film]]:
+    async def _films_list_from_cache(self, **kwargs) -> List[Film] | None:
         # Пытаемся получить данные о фильме из кеша, используя команду get https://redis.io/commands/get/
         data = await self.redis.get(orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS))
         if not data:

@@ -2,7 +2,7 @@ import abc
 import json
 from json import JSONDecodeError
 from logging import Logger
-from typing import Optional, Any
+from typing import Any
 
 
 class BaseStorage:
@@ -16,7 +16,7 @@ class BaseStorage:
 
 
 class JsonFileStorage(BaseStorage):
-    def __init__(self, logger: Logger, file_path: Optional[str] = 'storage.json'):
+    def __init__(self, logger: Logger, file_path: str | None = 'storage.json'):
         self.file_path = file_path
         self._logger = logger
 

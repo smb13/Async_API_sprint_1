@@ -1,4 +1,4 @@
-from typing import List, Optional, Annotated
+from typing import List, Annotated
 from uuid import UUID
 
 from annotated_types import MinLen, IsNotNan
@@ -19,5 +19,5 @@ class Person(BaseModel):
     """Идентификатор персоны (UUID)"""
     full_name: Annotated[str, IsNotNan, MinLen(1)]
     """Полное имя персоны"""
-    films: Optional[List[PersonFilms]] = []
+    films: List[PersonFilms] | None = []
     """Фильмы, в которых принимала участия указанная персона"""

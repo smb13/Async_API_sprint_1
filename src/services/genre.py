@@ -1,6 +1,6 @@
 import orjson
 from functools import lru_cache
-from typing import Optional, List
+from typing import List
 
 from elasticsearch import AsyncElasticsearch, NotFoundError
 from fastapi import Depends
@@ -24,7 +24,7 @@ class GenreService:
         self.elastic = elastic
 
     # Get_by_id возвращает объект жанра. Он опционален, так как жанр может отсутствовать в базе
-    async def get_by_id(self, genre_id: UUID4) -> Optional[Genre]:
+    async def get_by_id(self, genre_id: UUID4) -> Genre | None:
         # Пытаемся получить данные из кеша, потому что оно работает быстрее
         genre = await self._genre_from_cache(genre_id)
         if not genre:
@@ -56,7 +56,7 @@ class GenreService:
 
         return genres
 
-    async def _get_genre_from_elastic(self, genre_id: UUID4) -> Optional[Genre]:
+    async def _get_genre_from_elastic(self, genre_id: UUID4) -> Genre | None:
         try:
             doc = await self.elastic.get(index='genres', id=genre_id)
         except NotFoundError:
@@ -65,7 +65,7 @@ class GenreService:
 
     async def _get_genres_list_from_elastic(
             self, *, page: int | None = 1, per_page: int | None = 1
-    ) -> Optional[List[Genre]]:
+    ) -> List[Genre] | None:
         # Проверка аргументов.
         if page <= 0:
             page = 1
@@ -81,7 +81,7 @@ class GenreService:
             return None
         return list(map(lambda flm: Genre(**flm['_source']), doc['hits']['hits']))
 
-    async def _genre_from_cache(self, genre_id: UUID4) -> Optional[Genre]:
+    async def _genre_from_cache(self, genre_id: UUID4) -> Genre | None:
         # Пытаемся получить данные о жанре из кеша, используя команду get https://redis.io/commands/get/
         data = await self.redis.get(str(genre_id))
         if not data:
@@ -90,7 +90,7 @@ class GenreService:
         genre = Genre.model_validate_json(data)
         return genre
 
-    async def _genres_list_from_cache(self, **kwargs) -> Optional[List[Genre]]:
+    async def _genres_list_from_cache(self, **kwargs) -> List[Genre] | None:
         # Пытаемся получить данные о жанре из кеша, используя команду get https://redis.io/commands/get/
         data = await self.redis.get(orjson.dumps(kwargs, option=orjson.OPT_SORT_KEYS))
         if not data:
